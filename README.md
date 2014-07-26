@@ -226,6 +226,8 @@ function Robot()
     client = "775533",
   }
 
+  ind = Indicator{tag="MYIND"}
+
   while true do
     if feed.last > ind[-2] then
       order:update(feed.last, 1)
@@ -240,7 +242,7 @@ end
 Чтобы закрыть позицию вы можете, при определённых условиях, выполнить код:
 
 ```lua
-order.update(feed.last, 0)
+order:update(feed.last, 0)
 ```
 
 Робот готов. Это классический реверс по скользящей средней. Вы можете менять значение графика в реальном времени. Робот подстроится!
