@@ -175,6 +175,7 @@ function SmartOrder:update(price, planned)
   end
 end
 function SmartOrder:process()
+  log:debug("Processing SmartOrder " .. self.trans_id)
   local order = self.order
   if order ~= nil then
     local cancel = false
@@ -247,7 +248,10 @@ function SmartOrder:process()
     end
   end
 end
-function SmartOrder:isdone()
+function SmartOrder:remainder()
+  return (self.planned - self.position)
+end
+function SmartOrder:done()
   return (self.planned - self.position) == 0
 end
 setmetatable(SmartOrder, __object_behaviour)
@@ -295,14 +299,6 @@ function log:fatal(t)
   error(t)
 end
 
-
-function create_table()
-  orders_table = AllocTable()
-  trace(CreateWindow(orders_table) .. "")
-  AddColumn(orders_table, "test3", QTABLE_CACHED_STRING_TYPE, 50)
-  SetWindowCaption(orders_table, "MyTable")
-end
-
 --[[ √À¿¬Õ€… ÷» À ]]--
 working = true
 function main()
@@ -321,10 +317,10 @@ function main()
       if coroutine.status(routine) == "dead" then
         log:trace("Robot routine finished")
       end
-    end
-    -- Orders processing calls after every coroutine iteration
-    for trans_id, smartorder in pairs(SmartOrder.pool) do
-      smartorder:process()
+      -- Orders processing calls after every coroutine iteration
+      for trans_id, smartorder in pairs(SmartOrder.pool) do
+        smartorder:process()
+      end
     end
   end
   log:trace("Robot stopped")
@@ -359,16 +355,31 @@ function OnOrder(order)
     end
   end
 end
-
-
+withgui = false
 --[[ INIT CALLBACK ]]--
 function OnInit(path)
   -- Only there it's possible to take path
   log.logfile = io.open(path..'.log', 'w')
+  -- Table creation
+  if withgui == true then
+    local table_id = AllocTable()
+    if CreateWindow(table_id) == 1 then
+      log:trace("SmartOrders table created, id=" .. table_id)
+      SetWindowCaption(table_id, "SmartOrders [" .. path .. "]")
+      AddColumn(table_id, "trans_id", nil, QTABLE_INT_TYPE, 10)
+      AddColumn(table_id, "status", nil, QTABLE_STRING_TYPE, 10)
+    else
+      log:fatal("SmartOrders table not created!" .. table_id)
+    end
+    SmartOrder.table = table_id
+  end
 end
 
 
 --[[ END CALLBACK ]]--
 function OnStop(stop_flag)
   working = false
+  if withgui == true then
+    DestroyTable(SmartOrder.table)
+  end
 end
