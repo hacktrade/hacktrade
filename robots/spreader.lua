@@ -1,4 +1,4 @@
-dofile("../hacktrade.lua")
+dofile(getScriptPath().."\\hacktrade.lua")
 
 function Robot()
 
