@@ -1,8 +1,17 @@
 --[[
-[   HackTrade version 1.3
+[   HackTrade version 1.4
 [   Nano-framework for HFT-robots development.
 [   -----------------------------------------------------------
 [   © 2014 Denis Kolodin
+[
+[]]--
+
+--[[
+[   Releases:
+[     1.3.1 - Bids in quotes 2 reverses. Fix bugs.
+[
+[
+[
 [
 []]--
 
@@ -15,12 +24,29 @@
 
 
 --[[ SERVICE FUNCTIONS ]]--
-function string.starts(String,Start)
-   return string.sub(String,1,string.len(Start))==Start
+function string.starts(source, starts)
+   return string.sub(source, 1, string.len(starts)) == starts
 end
 
-function string.ends(String,End)
-   return End=='' or string.sub(String,-string.len(End))==End
+function string.ends(source, ends)
+   return End=='' or string.sub(source,-string.len(ends)) == ends
+end
+
+function table.reverse(tab)
+  local size = #tab
+  local ntab = {}
+  for i, v in ipairs(tab) do
+    ntab[size-i+1] = v
+  end
+  return ntab
+end
+
+function table.transform(tab, felem)
+  local ntab = {}
+  for idx = 1, #tab do
+    ntab[idx] = felem(tab[idx])
+  end
+  return ntab
 end
 
 Trade = coroutine.yield
@@ -47,6 +73,12 @@ end
 
 --[[ MARKET DATA SOURCE ]]--
 MarketData = {}
+function MarketData._pvconverter(elem)
+  local nelem = {}
+  nelem.price = tonumber(elem.price)
+  nelem.volume = tonumber(elem.volume)
+  return nelem
+end
 function MarketData:init()
   log:trace("MarketData created: " .. self.market .. " " .. self.ticker)
 end
@@ -61,11 +93,14 @@ function MarketData:__index(key)
   end
   ]]--
   if key == "bids" then
-    local data = getQouteLevel2(self.market, self.ticker)
-    return data.bid
+    local data = getQuoteLevel2(self.market, self.ticker).bid
+    data = table.reverse(data) -- Reverse for normal order (not alphabet)!
+    data = table.transform(data, self._pvconverter)
+    return data or {}
   elseif key == "offers" then
-    local data = getQouteLevel2(self.market, self.ticker)
-    return data.offer
+    local data = getQuoteLevel2(self.market, self.ticker).offer
+    data = table.transform(data, self._pvconverter)
+    return data or {}
   end
   local param = getParamEx(self.market, self.ticker, key)
   if tonumber(param.param_type) < 3 then
@@ -147,6 +182,26 @@ SmartOrder = {
   upper = 10000,
   pool = {}
 }
+function SmartOrder:__index(key)
+  if SmartOrder[key] ~= nil then
+    return SmartOrder[key]
+  end
+  --[[
+  for k, v in pairs(self) do
+    if key == k then
+      return v
+    end
+  end
+  ]]--
+  -- Dynamic fields have to be calculated!
+  if key == "remainder" then
+    return (self.planned - self.position)    
+  end
+  if key == "filled" then
+    return (self.planned - self.position) == 0  
+  end
+  return nil
+end
 function SmartOrder:init()
   math.randomseed(os.time())
   for i = self.lower, self.upper do
@@ -248,12 +303,6 @@ function SmartOrder:process()
     end
   end
 end
-function SmartOrder:remainder()
-  return (self.planned - self.position)
-end
-function SmartOrder:done()
-  return (self.planned - self.position) == 0
-end
 setmetatable(SmartOrder, __object_behaviour)
 
 
@@ -299,7 +348,7 @@ function log:fatal(t)
   error(t)
 end
 
---[[ ÃËÀÂÍÛÉ ÖÈÊË ]]--
+--[[ MAIN LOOP ]]--
 working = true
 function main()
   --create_table()
@@ -316,6 +365,7 @@ function main()
       end
       if coroutine.status(routine) == "dead" then
         log:trace("Robot routine finished")
+        break
       end
       -- Orders processing calls after every coroutine iteration
       for trans_id, smartorder in pairs(SmartOrder.pool) do
