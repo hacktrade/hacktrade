@@ -17,8 +17,8 @@ function Robot()
 	local MAX_OPT_QTY = 4			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
-	local MAX_VOLA = 36				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
-	local FIX_VOLA = 35				-- желательная волатильность, указывается в процентах
+	local MAX_VOLA = 35				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
+	local FIX_VOLA = 34 			-- желательная волатильность, указывается в процентах
     local CONST = 1					-- отступ от лучшей цены для заявок (указывается в ШАГАХ ЦЕНЫ)
 	local COMMENT = "Straddle"		-- комментарий к заявке для "Истории позиций"
 
@@ -60,10 +60,13 @@ function Robot()
 
     local optionbase=getParamEx(OPT_CLASS,OPT_TICKER,"optionbase").param_image
     local optiontype=getParamEx(OPT_CLASS,OPT_TICKER,"optiontype").param_image
-    local step=getParamEx(OPT_CLASS,OPT_TICKER,"STEPPRICE,").param_value
-
-    log:debug("Optionbase= "..optionbase.." Optiontype= "..optiontype)
-    log:debug("MAX_VOLA= "..MAX_VOLA.." FIX_VOLA= "..FIX_VOLA)
+    
+    --local step=getParamEx(OPT_CLASS,OPT_TICKER,"SEC_PRICE_STEP,").param_value
+    local step=opt_feed.SEC_PRICE_STEP
+	--log:debug("step="..step)
+	
+    log:debug("optionbase= "..optionbase.." optiontype= "..optiontype)
+    log:debug("MAX_VOLA="..MAX_VOLA.." FIX_VOLA="..FIX_VOLA)
 
 --[[
     ind = Indicator{
@@ -82,7 +85,7 @@ function Robot()
 	    	vola = opt_feed.volatility                -- текущая волатильность опциона
 
             local tmpParam = {
-                    ["Optiontype"] = optiontype,                                                                -- тип опциона
+                    ["optiontype"] = optiontype,                                                                -- тип опциона
                     ["settleprice"] = getParamEx(FUT_CLASS,FUT_TICKER,"settleprice").param_value+0,             -- текущая цена фьючерса
                     ["strike"] = getParamEx(OPT_CLASS,OPT_TICKER,"strike").param_value+0,                       -- страйк опциона
                     ["volatility"] = FIX_VOLA,                                                                  -- волатильность опциона: берём желаемую FIX_VOLA
@@ -90,7 +93,6 @@ function Robot()
             }
 
             theor_price = TheorPrice (tmpParam)                                                         -- наша теоретическая цена
-            theor_price = round(theor_price,10)
             theor_price = theor_price - math.fmod(theor_price,step) 									-- округляем до шага цены вниз
 
 		    best_offer = opt_feed.offers[1].price --потом убрать, нужно для лога

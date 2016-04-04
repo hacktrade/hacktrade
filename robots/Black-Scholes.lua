@@ -100,7 +100,7 @@ function TheorPrice(tmpParam) -- возвращает теоретическую
 	local d1 = (math.log(S / K) + (r + b * b * 0.5) * Tt) / (b * math.sqrt(Tt))
 	local d2 = d1-(b * math.sqrt(Tt))
 	local e = math.exp(-1 * r * Tt)
-
+   log:debug("tmpParam.optiontype="..tmpParam.optiontype)
     if tmpParam.optiontype == "Call" then
     	price = S * N(d1) - K * e * N (d2)											-- теоретическая цена опциона call
     else
