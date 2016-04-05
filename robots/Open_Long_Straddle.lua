@@ -46,14 +46,14 @@ function Robot()
 
     opt_order = SmartOrder{			-- создаем умную заявку для опциона
         account=ACCOUNT,
-        client=COMMENT,
+        client=ACCOUNT.."//"..COMMENT,
         market=OPT_CLASS,
         ticker=OPT_TICKER
     }
 
     fut_order = SmartOrder{			-- создаем умную заявку для фьючерса
         account=ACCOUNT,
-        client=COMMENT,
+        client=ACCOUNT.."//"..COMMENT,
         market=FUT_CLASS,
         ticker=FUT_TICKER
     }
