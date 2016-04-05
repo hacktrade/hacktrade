@@ -17,8 +17,8 @@ function Robot()
 	local MAX_OPT_QTY = 4			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
-	local MAX_VOLA = 35				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
-	local FIX_VOLA = 34 			-- желательная волатильность, указывается в процентах
+	local MAX_VOLA = 35.5			-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
+	local FIX_VOLA = 35 			-- желательная волатильность, указывается в процентах
     local CONST = 1					-- отступ от лучшей цены для заявок (указывается в ШАГАХ ЦЕНЫ)
 	local COMMENT = "Straddle"		-- комментарий к заявке для "Истории позиций"
 
@@ -54,8 +54,8 @@ function Robot()
     fut_order = SmartOrder{			-- создаем умную заявку для фьючерса
         account=ACCOUNT,
         client=COMMENT,
-        market=CLASS,
-        ticker=TICKER
+        market=FUT_CLASS,
+        ticker=FUT_TICKER
     }
 
     local optionbase=getParamEx(OPT_CLASS,OPT_TICKER,"optionbase").param_image
