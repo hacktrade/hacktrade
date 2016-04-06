@@ -17,12 +17,14 @@ function Robot()
 	local MAX_OPT_QTY = 4			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
-	local MAX_VOLA = 36				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
+	local MAX_VOLA = 35				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
 	local FIX_VOLA = 35 			-- желательная волатильность, указывается в процентах
     local CONST = 1					-- отступ от лучшей цены для заявок (указывается в ШАГАХ ЦЕНЫ)
+	local SLACK = 1					-- люфт - разница между текущей ценой заявки и новой расчетной ценой. Если разница меньше, чем люфт, то имеющуюся заявку не меняем.
+
 	local COMMENT = "Str"			-- комментарий к заявке для "Истории позиций"
 
-	local SLEEP_WITH_ORDER = 60000	-- время ожидания исполнения выставленного ордера до пересчета теоретичской цены (в миллисекундах)
+	local SLEEP_WITH_ORDER = 1000	-- время ожидания исполнения выставленного ордера до пересчета теоретической цены (в миллисекундах)
 	local SLEEP_WO_ORDER = 100		-- время ожидания после снятия ордера (в миллисекундах)
 
 -- Конец раздела с входящими параметрами
@@ -78,6 +80,9 @@ function Robot()
     while working do
 
     	opt_qty = opt_qty + OPT_LOT 					-- увеличиваем позицию по опциону
+		local new_price = 0
+		local order_price = 0
+
 		local i = 0
 
         repeat
@@ -108,48 +113,65 @@ function Robot()
             theor_price_calc = theor_price_calc - math.fmod(theor_price_calc,step) 								-- округляем до шага цены вниз
 
 
-		    best_offer = opt_feed.offers[1].price --потом убрать, нужно для лога
+		    best_offer = opt_feed.offers[1].price --потом убрать, нужно только для лога
 
 		    log:debug ("==============================================================================================#"..i.."=")
 			log:debug ("vola="..vola.." max_vola="..MAX_VOLA.." best_offer="..best_offer.." theor_price_fix="..theor_price_fix.." theor_price_calc="..theor_price_calc.." quik_theor_price="..opt_feed.theorprice.." opt_qty="..opt_qty)
 
 		    if vola > MAX_VOLA then                                  	-- если текущая волатильность слишком высокая, то используем теоретическую цену, рассчитанную
 																		-- на базе желаемой волатильности по формуле Блека-Шоулза
-                opt_order:update(theor_price_fix, opt_qty)            	-- выставляем заявку по нашей теоретической цене
+                --opt_order:update(theor_price_fix, opt_qty)            	-- выставляем заявку по нашей теоретической цене
+				new_price = theor_price_fix
                 log:debug("decision:1 >> theor_price_fix")
 		    else
 		    	best_offer = opt_feed.offers[1].price   			 	-- минимальная цена предложения BEST_OFFER
 
                 if best_offer < theor_price_calc then
 
-                    opt_order:update(best_offer + CONST * step, opt_qty)
+                    --opt_order:update(best_offer + CONST * step, opt_qty)
+					new_price = best_offer + CONST * step
                     log:debug("decision:2 >> best_offer + CONST")
 
                 elseif best_offer == theor_price_calc then
 
-                    opt_order:update(best_offer, opt_qty)
+					--opt_order:update(best_offer, opt_qty)
+					new_price = best_offer
                     log:debug("decision:3 >> best_offer")
 
                 elseif best_offer > theor_price_calc then
 
                     if best_offer > theor_price_calc + MAX_LAG * step then
 
-                        opt_order:update(theor_price_calc, opt_qty)
+                        --opt_order:update(theor_price_calc, opt_qty)
+						new_price = theor_price_calc
                         log:debug("decision:4 >> theor_price_calc")
 
                     else
-                        opt_order:update(best_offer - CONST * step, opt_qty)
+                        --opt_order:update(best_offer - CONST * step, opt_qty)
+						new_price = best_offer - CONST * step
                         log:debug("decision:5 >> best_offer - CONST")
                     end
                 end
 
 		    end
 
+			if math.abs(order_price - new_price) > SLACK*step then
+				log:debug("UPDATE >> new_price="..new_price.." order_price="..order_price)
+				order_price = new_price
+				opt_order:update(order_price, opt_qty)
+			else
+				log:debug("Nothing to do >> new_price="..new_price.." order_price="..order_price)
+			end
+
 	        Trade()
 
-	        if opt_order.order ~= nil then
+	        log:debug("----------------------------------------------------------------------------------------------------")
+
+	        if opt_order.order ~= nil and opt_order.order.price == order_price then
+	        	log:debug("SLEEP_WITH_ORDER")
 	        	sleep (SLEEP_WITH_ORDER)
 	        else
+	        	log:debug("SLEEP_WO_ORDER")	        	
 	        	sleep (SLEEP_WO_ORDER)
 	        end
 
@@ -162,7 +184,7 @@ function Robot()
 
 	        Trade()
 
-	        if fut_order.order ~= nil then
+	        if fut_order.order ~= nil and fut_order.order.price == fut_feed.offers[1].price then
 	        	sleep (SLEEP_WITH_ORDER)
 	        else
 	        	sleep (SLEEP_WO_ORDER)
