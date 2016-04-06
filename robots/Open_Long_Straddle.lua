@@ -1,20 +1,22 @@
--- Робот “Открытие стредла” ver 0.2
+-- Робот “Открытие стредла” ver 0.3
 -- открывает синтетический стредл на опционах CALL
 
 --используем фреймворк "HackTrade" https://github.com/hacktrade/hacktrade.git
 dofile("../hacktrade.lua")
-require("Black-Scholes")
 
+require("Black-Scholes")			-- функции расчета теоретической цены и греков
+require("utils")					-- вспомогательные функции для работы со строками 
 
 function Robot()
 
--- Входящие параметры
+--================= ВХОДЯЩИЕ ПАРАМЕТРЫ ======================
+
 	local ACCOUNT ="410097K"		-- торговый счет
 	local FUT_CLASS = "SPBFUT"		-- класс FORTS
 	local OPT_CLASS = "SPBOPT"		-- класс опционы FORTS
 	local FUT_TICKER = "RIM6"		-- код бумаги фьючерса
 	local OPT_TICKER = "RI85000BF6"	-- код бумаги опциона
-	local MAX_OPT_QTY = 4			-- максимальное количество опционов для покупки
+	local MAX_OPT_QTY = 50			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
 	local MAX_VOLA = 35				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
@@ -22,12 +24,40 @@ function Robot()
     local CONST = 1					-- отступ от лучшей цены для заявок (указывается в ШАГАХ ЦЕНЫ)
 	local SLACK = 1					-- люфт - разница между текущей ценой заявки и новой расчетной ценой. Если разница меньше, чем люфт, то имеющуюся заявку не меняем.
 
-	local COMMENT = "Str"			-- комментарий к заявке для "Истории позиций"
+	local COMMENT = "str"			-- комментарий к заявке для "Истории позиций"
 
 	local SLEEP_WITH_ORDER = 1000	-- время ожидания исполнения выставленного ордера до пересчета теоретической цены (в миллисекундах)
 	local SLEEP_WO_ORDER = 100		-- время ожидания после снятия ордера (в миллисекундах)
 
--- Конец раздела с входящими параметрами
+    local OPEN_POSITIONS_FILE = "C:\\Program Files (x86)\\Info\\QPILE\\ОткрытыеПозиции.csv"  -- путь к файлу, где храняться открытые позиции
+     
+--======== КОНЕЦ РАЗДЕЛА ВХОДЯЩИХ ПАРАМЕТРОВ ==================
+
+-- Читаем файл с открытыми позициями OPEN_POSITIONS_FILE, чтобы определить нашу начальную позицию, которую мы уже набрали ранее. Ориентируемся на поле "Комментарий"
+    local parameters = {separator = ";",header = true}
+
+    local csv = require("csv")
+    local f,err = csv.open(Utf8ToAnsi(OPEN_POSITIONS_FILE),parameters)     
+
+    if err then log:debug(err) end
+
+    for row in f:lines() do
+        if row[Utf8ToAnsi("Комментарий")] == COMMENT and row[Utf8ToAnsi("Код класса")] == OPT_CLASS and row[Utf8ToAnsi("Код бумаги")] == OPT_TICKER then
+            if row[Utf8ToAnsi("Операция")] == "BUY" then
+                opt_start_position = row[Utf8ToAnsi("Кол-во")]
+            else
+                opt_start_position = 0-row[Utf8ToAnsi("Кол-во")]
+            end
+        elseif row[Utf8ToAnsi("Комментарий")] == COMMENT and row[Utf8ToAnsi("Код класса")] == FUT_CLASS and row[Utf8ToAnsi("Код бумаги")] == FUT_TICKER then
+            if row[Utf8ToAnsi("Операция")] == "BUY" then
+                fut_start_position = row[Utf8ToAnsi("Кол-во")]
+            else
+                fut_start_position = 0-row[Utf8ToAnsi("Кол-во")]
+            end
+        end 
+    end
+-- начальную позицию определили
+
 
 	local working = true
     local vola
@@ -61,6 +91,9 @@ function Robot()
         ticker=FUT_TICKER
     }
 
+    opt_order.position = opt_start_position
+    fut_order.position = fut_start_position
+
     local optionbase=getParamEx(OPT_CLASS,OPT_TICKER,"optionbase").param_image
     local optiontype=getParamEx(OPT_CLASS,OPT_TICKER,"optiontype").param_image
 
@@ -69,6 +102,7 @@ function Robot()
 	--log:debug("step="..step)
 
     log:debug("optionbase= "..optionbase.." optiontype= "..optiontype)
+    log:debug ("opt_start_position="..tostring(opt_start_position).." fut_start_position="..tostring(fut_start_position))
     log:debug("MAX_VOLA="..MAX_VOLA.." FIX_VOLA="..FIX_VOLA)
 
 --[[
