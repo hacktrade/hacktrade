@@ -16,7 +16,7 @@ function Robot()
 	local OPT_CLASS = "SPBOPT"		-- класс опционы FORTS
 	local FUT_TICKER = "RIM6"		-- код бумаги фьючерса
 	local OPT_TICKER = "RI85000BF6"	-- код бумаги опциона
-	local MAX_OPT_QTY = 52			-- максимальное количество опционов для покупки
+	local MAX_OPT_QTY = 50			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
 	local MAX_VOLA = 35.5				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
@@ -47,16 +47,19 @@ function Robot()
     	return 
     end 	
 
+    local opt_start_position = 0
+    local fut_start_position = 0
+
     for row in f:lines() do
         if row[Utf8ToAnsi("Комментарий")] == COMMENT and row[Utf8ToAnsi("Код класса")] == OPT_CLASS and row[Utf8ToAnsi("Код бумаги")] == OPT_TICKER then
             if row[Utf8ToAnsi("Операция")] == "BUY" then
-                opt_start_position = row[Utf8ToAnsi("Кол-во")]
+                opt_start_position = 0+row[Utf8ToAnsi("Кол-во")]
             else
                 opt_start_position = 0-row[Utf8ToAnsi("Кол-во")]
             end
         elseif row[Utf8ToAnsi("Комментарий")] == COMMENT and row[Utf8ToAnsi("Код класса")] == FUT_CLASS and row[Utf8ToAnsi("Код бумаги")] == FUT_TICKER then
             if row[Utf8ToAnsi("Операция")] == "BUY" then
-                fut_start_position = row[Utf8ToAnsi("Кол-во")]
+                fut_start_position = 0+row[Utf8ToAnsi("Кол-во")]
             else
                 fut_start_position = 0-row[Utf8ToAnsi("Кол-во")]
             end
@@ -71,7 +74,6 @@ function Robot()
     local theor_price_calc
 	local theor_price_fix
     local theor_price_quik
-    local opt_qty = 0				-- начальная позиция по опционам
 
     opt_feed = MarketData{			-- читаем текущие параметры по опциону
         market=OPT_CLASS,
@@ -98,11 +100,11 @@ function Robot()
     }
 
     opt_order.position = opt_start_position
-    opt_qty = opt_start_position
+    local opt_qty = opt_start_position
     opt_order:update(0, opt_qty)
 
     fut_order.position = fut_start_position
-    fut_qty = fut_start_position
+    local fut_qty = fut_start_position
     fut_order:update(0,fut_qty)
 
     Trade()
@@ -125,8 +127,13 @@ function Robot()
   ]]
  
     while working do
+    	
+        if opt_qty + OPT_LOT <= MAX_OPT_QTY then		-- если текущая позиция меньше заданой, то увеличиваем позицию по опциону
+          	opt_qty = opt_qty + OPT_LOT 					
+        else
+        	opt_qty = MAX_OPT_QTY
+        end  	
 
-    	opt_qty = opt_qty + OPT_LOT 					-- увеличиваем позицию по опциону
 		local new_price = 0
 		local order_price = 0
 
@@ -241,7 +248,7 @@ function Robot()
 
         if opt_order.position >= MAX_OPT_QTY then  				-- стредл куплен, завершаем работу
         	working = false
-        	log:trace("Straddle opened >> "..OPT_TICKER..": +"..opt_order.position.." and "..FUT_TICKER..": -"..fut_order.position)
+        	log:trace("Straddle opened >> "..OPT_TICKER..": "..opt_order.position.." and "..FUT_TICKER..": "..fut_order.position)
         end
 
     end
