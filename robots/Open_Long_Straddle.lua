@@ -1,4 +1,4 @@
--- Робот “Открытие стредла” ver 0.3
+-- Робот “Открытие стредла” ver 0.4
 -- открывает синтетический стредл на опционах CALL
 
 --используем фреймворк "HackTrade" https://github.com/hacktrade/hacktrade.git
@@ -16,10 +16,10 @@ function Robot()
 	local OPT_CLASS = "SPBOPT"		-- класс опционы FORTS
 	local FUT_TICKER = "RIM6"		-- код бумаги фьючерса
 	local OPT_TICKER = "RI85000BF6"	-- код бумаги опциона
-	local MAX_OPT_QTY = 50			-- максимальное количество опционов для покупки
+	local MAX_OPT_QTY = 52			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
-	local MAX_VOLA = 35				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
+	local MAX_VOLA = 35.5				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
 	local FIX_VOLA = 35 			-- желательная волатильность, указывается в процентах
     local CONST = 1					-- отступ от лучшей цены для заявок (указывается в ШАГАХ ЦЕНЫ)
 	local SLACK = 1					-- люфт - разница между текущей ценой заявки и новой расчетной ценой. Если разница меньше, чем люфт, то имеющуюся заявку не меняем.
@@ -29,7 +29,7 @@ function Robot()
 	local SLEEP_WITH_ORDER = 1000	-- время ожидания исполнения выставленного ордера до пересчета теоретической цены (в миллисекундах)
 	local SLEEP_WO_ORDER = 100		-- время ожидания после снятия ордера (в миллисекундах)
 
-    local OPEN_POSITIONS_FILE = "C:\\Program Files (x86)\\Info\\QPILE\\ОткрытыеПозиции.csv"  -- путь к файлу, где храняться открытые позиции
+    local OPEN_POSITIONS_FILE = "C:\\QUIK_OpenBroker\\QPILE\\ОткрытыеПозиции.csv"  -- путь к файлу, где храняться открытые позиции
      
 --======== КОНЕЦ РАЗДЕЛА ВХОДЯЩИХ ПАРАМЕТРОВ ==================
 
@@ -39,7 +39,13 @@ function Robot()
     local csv = require("csv")
     local f,err = csv.open(Utf8ToAnsi(OPEN_POSITIONS_FILE),parameters)     
 
-    if err then log:debug(err) end
+    if f == nil then -- если не смогли открыть файл с Историей позиций
+    	if err then 
+    		log:trace("Failed to open \"OPEN_POSITIONS_FILE\" file! "..err) 
+    		message("Failed to open \"OPEN_POSITIONS_FILE\" file! "..err,2)
+    	end
+    	return 
+    end 	
 
     for row in f:lines() do
         if row[Utf8ToAnsi("Комментарий")] == COMMENT and row[Utf8ToAnsi("Код класса")] == OPT_CLASS and row[Utf8ToAnsi("Код бумаги")] == OPT_TICKER then
@@ -92,7 +98,14 @@ function Robot()
     }
 
     opt_order.position = opt_start_position
+    opt_qty = opt_start_position
+    opt_order:update(0, opt_qty)
+
     fut_order.position = fut_start_position
+    fut_qty = fut_start_position
+    fut_order:update(0,fut_qty)
+
+    Trade()
 
     local optionbase=getParamEx(OPT_CLASS,OPT_TICKER,"optionbase").param_image
     local optiontype=getParamEx(OPT_CLASS,OPT_TICKER,"optiontype").param_image
@@ -110,7 +123,7 @@ function Robot()
         tag=""
     }
   ]]
-
+ 
     while working do
 
     	opt_qty = opt_qty + OPT_LOT 					-- увеличиваем позицию по опциону
