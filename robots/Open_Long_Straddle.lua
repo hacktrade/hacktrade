@@ -26,7 +26,7 @@ function Robot()
 
 	local COMMENT = "str"			-- комментарий к заявке для "Истории позиций"
 
-	local SLEEP_WITH_ORDER = 1000	-- время ожидания исполнения выставленного ордера до пересчета теоретической цены (в миллисекундах)
+	local SLEEP_WITH_ORDER = 5000	-- время ожидания исполнения выставленного ордера до пересчета теоретической цены (в миллисекундах)
 	local SLEEP_WO_ORDER = 100		-- время ожидания после снятия ордера (в миллисекундах)
 
     local OPEN_POSITIONS_FILE = "C:\\QUIK_OpenBroker\\QPILE\\ОткрытыеПозиции.csv"  -- путь к файлу, где храняться открытые позиции
@@ -224,14 +224,25 @@ function Robot()
 
         until opt_order.filled 									-- работаем, пока не купим очередной лот опционов
 
-        repeat
+        new_price = 0
+        order_price = 0
+
+        repeat													-- начинаем продавать фьючерсы
 
         	fut_qty = 0-math.floor(opt_order.position/2)		-- для стредла количество фьючерсов в два раза меньше количества опционов
-        	fut_order:update(fut_feed.offers[1].price,fut_qty)	-- ставим заявку на продажу фьючерса по лучшей цене
+        	new_price = fut_feed.offers[1].price - CONST * step -- встаем с лучшим предложением
 
+			if math.abs(order_price - new_price) > SLACK*step then
+				log:debug("UPDATE >> new_price="..new_price.." order_price="..order_price)
+				order_price = new_price
+				fut_order:update(order_price,fut_qty)			-- ставим заявку на продажу фьючерса по лучшей цене
+			else
+				log:debug("Nothing to do >> new_price="..new_price.." order_price="..order_price)
+			end
+        	
 	        Trade()
 
-	        if fut_order.order ~= nil and fut_order.order.price == fut_feed.offers[1].price then
+	        if fut_order.order ~= nil and fut_order.order.price == order_price then
 	        	sleep (SLEEP_WITH_ORDER)
 	        else
 	        	sleep (SLEEP_WO_ORDER)
