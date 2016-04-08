@@ -16,7 +16,7 @@ function Robot()
 	local OPT_CLASS = "SPBOPT"		-- класс опционы FORTS
 	local FUT_TICKER = "RIM6"		-- код бумаги фьючерса
 	local OPT_TICKER = "RI85000BF6"	-- код бумаги опциона
-	local MAX_OPT_QTY = 52			-- максимальное количество опционов для покупки
+	local MAX_OPT_QTY = 54			-- максимальное количество опционов для покупки
 	local OPT_LOT = 2				-- количество лотов для заявки на покупку опционов
 	local MAX_LAG = 2				-- максимальное превышение цены над теоретической ценой (указывается в ШАГАХ ЦЕНЫ)
 	local MAX_VOLA = 35.5				-- максимальная волатильность опционов, по которой мы готовы покупать, указывается в процентах
@@ -113,9 +113,9 @@ function Robot()
     local optionbase=getParamEx(OPT_CLASS,OPT_TICKER,"optionbase").param_image
     local optiontype=getParamEx(OPT_CLASS,OPT_TICKER,"optiontype").param_image
 
-    --local step=getParamEx(OPT_CLASS,OPT_TICKER,"SEC_PRICE_STEP,").param_value
     local step=opt_feed.SEC_PRICE_STEP
-	--log:debug("step="..step)
+    local fut_step=fut_feed.SEC_PRICE_STEP
+	
 
     log:debug("optionbase= "..optionbase.." optiontype= "..optiontype)
     log:debug ("opt_start_position="..tostring(opt_start_position).." fut_start_position="..tostring(fut_start_position))
@@ -230,9 +230,9 @@ function Robot()
         repeat													-- начинаем продавать фьючерсы
 
         	fut_qty = 0-math.floor(opt_order.position/2)		-- для стредла количество фьючерсов в два раза меньше количества опционов
-        	new_price = fut_feed.offers[1].price - CONST * step -- встаем с лучшим предложением
+        	new_price = fut_feed.offers[1].price - fut_step 	-- встаем с лучшим предложением
 
-			if math.abs(order_price - new_price) > SLACK*step then
+			if math.abs(order_price - new_price) > SLACK*fut_step then
 				log:debug("UPDATE >> new_price="..new_price.." order_price="..order_price)
 				order_price = new_price
 				fut_order:update(order_price,fut_qty)			-- ставим заявку на продажу фьючерса по лучшей цене
