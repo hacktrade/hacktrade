@@ -2,7 +2,7 @@
 [   HackTrade version 1.4
 [   Nano-framework for HFT-robots development.
 [   -----------------------------------------------------------
-[   © 2014 Denis Kolodin
+[   Â© 2014 Denis Kolodin
 [
 []]--
 
@@ -230,20 +230,23 @@ function SmartOrder:update(price, planned)
   end
 end
 function SmartOrder:process()
-  log:debug("Processing SmartOrder " .. self.trans_id)
+  log:debug("----------------------------------------------------------------------------------------------------")
+  log:debug("Processing SmartOrder >> " .. self.trans_id)
   local order = self.order
   if order ~= nil then
+    log:debug("Parameters >> ".."price="..tostring(self.price).." planned="..self.planned.." position="..self.position.." order_qty="..order.quantity)
     local cancel = false
     if order.price ~= self.price then
       cancel = true
+      log:debug("NEW PRICE="..self.price)
     end
     local filled = order.filled * order.sign
-    -- log:debug("Difference: " .. self.planned .. " " .. self.position .. " " .. order.quantity)
+    --log:debug("Difference >> planned=" .. self.planned .. " position=" .. self.position .. " order_qty=" .. order.quantity)
     if self.planned - self.position - order.quantity ~= 0 then
       cancel = true
     end
     if order.active == false then
-      -- Ñ÷èòàåì ïîñëå óñòàíîâêè ôëàãà!!!
+      -- Ð¡Ñ‡Ð¸Ñ‚Ð°ÐµÐ¼ Ð¿Ð¾ÑÐ»Ðµ ÑƒÑÑ‚Ð°Ð½Ð¾Ð²ÐºÐ¸ Ñ„Ð»Ð°Ð³Ð°!!!
       filled = order.filled * order.sign
       self.position = self.position + filled
       self.order = nil
@@ -262,17 +265,18 @@ function SmartOrder:process()
               SECCODE=self.ticker,
               TRANS_ID="666",
               ACTION="KILL_ORDER",
-              ORDER_KEY=tostring(self.order.number)
+              ORDER_KEY=tostring(self.order.number),
             })
             if result == "" then
               self.order.cancelled = os.time()
             end
-            log:debug("Kill order")
+            log:debug("Kill order!")
           end
         end
       end
     end
   else
+    log:debug("Parameters >> ".."price="..tostring(self.price).." planned="..self.planned.." position="..self.position.." order_qty=nil")
     local diff = self.planned - self.position
     if diff ~= 0 then
       if self.order == nil then
@@ -289,6 +293,7 @@ function SmartOrder:process()
           PRICE=tostring(self.price),
           QUANTITY=tostring(absdiff)
         })
+
         if result == "" then
           self.order = {
             sign = diff / absdiff,
@@ -297,8 +302,10 @@ function SmartOrder:process()
             active = true,
             filled = 0,
           }
-        end
-        log:debug("Kill order")
+          log:debug("NEW_ORDER  >> "..self.market.." "..self.ticker.." price="..tostring(self.price).." qty="..tostring(absdiff))
+        else       
+          log:debug("New order ERROR: "..result)
+        end  
       end
     end
   end
@@ -309,7 +316,7 @@ setmetatable(SmartOrder, __object_behaviour)
 --[[ LOGGING ]]--
 log = {
     logfile = nil,
-    loglevel = 0,
+    loglevel = -1,
     loglevels = {
         [-1] = 'Debug',
         [ 0] = 'Trace',
